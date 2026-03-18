@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OR RAG Bot - Operations Research Assistant</title>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$','$$'], ['\\[','\\]']]
+            },
+            svg: { fontCache: 'global' }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            height: 90vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .header .stats {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+        }
+
+        .stat-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 15px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .avatar.bot {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .avatar.user {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 15px 20px;
+            border-radius: 15px;
+            line-height: 1.6;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        
+        .message-content :where(.MathJax, .MathJax_Display) {
+            max-width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+        
+        .message-content pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-x: auto;
+            max-width: 100%;
+        }
+
+        .message.bot .message-content {
+            background: white;
+            border: 1px solid #e0e0e0;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .code-output {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            border-left: 4px solid #667eea;
+        }
+
+        .input-area {
+            padding: 20px 30px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+
+        .query-type-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .query-type-btn {
+            padding: 8px 16px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .query-type-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .query-type-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        #userInput {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 15px;
+            resize: none;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        #userInput:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        #sendBtn {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        #sendBtn:hover {
+            transform: scale(1.05);
+        }
+
+        #sendBtn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .welcome-message {
+            text-align: center;
+            padding: 50px 20px;
+            color: #666;
+        }
+
+        .welcome-message h2 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .example-queries {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .example-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .example-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .example-card h4 {
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+
+        .example-card p {
+            font-size: 13px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>OR RAG Bot</h1>
+            <div class="stats">
+                <div class="stat-badge" id="docCount">Loading...</div>
+                <div class="stat-badge">Status: <span id="status">Active</span></div>
+            </div>
+        </div>
+
+        <div class="chat-area" id="chatArea">
+            <div class="welcome-message">
+                <h2>Welcome to OR RAG Bot!</h2>
+                <p>Your AI-powered Operations Research assistant. Ask me about:</p>
+                
+                <div class="example-queries">
+                    <div class="example-card" onclick="useExample('Formulate a production planning problem for a factory that produces 3 products with limited machine hours and labor.')">
+                        <h4>📊 Problem Formulation</h4>
+                        <p>Get mathematical models for your OR problems</p>
+                    </div>
+                    <div class="example-card" onclick="useExample('What happens if I increase the budget constraint by 20%?')">
+                        <h4>📈 Sensitivity Analysis</h4>
+                        <p>Analyze constraint modifications</p>
+                    </div>
+                    <div class="example-card" onclick="useExample('Generate Python code using PuLP to solve a transportation problem')">
+                        <h4>💻 Code Generation</h4>
+                        <p>Get executable optimization code</p>
+                    </div>
+                    <div class="example-card" onclick="useExample('Explain shadow prices in simple terms')">
+                        <h4>📚 Concept Explanation</h4>
+                        <p>Understand OR concepts clearly</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 15px;">Thinking...</p>
+        </div>
+
+        <div class="input-area">
+            <div class="query-type-selector">
+                <button class="query-type-btn active" data-type="formulation">Formulation</button>
+                <button class="query-type-btn" data-type="code">Code</button>
+                <button class="query-type-btn" data-type="explanation">Explanation</button>
+            </div>
+            <div class="input-container">
+                <textarea id="userInput" rows="2" placeholder="Ask me about your operations research problem..."></textarea>
+                <button id="sendBtn" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentQueryType = 'formulation';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            // Query type selector
+            document.querySelectorAll('.query-type-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.query-type-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentQueryType = this.dataset.type;
+                });
+            });
+
+            // Enter to send
+            document.getElementById('userInput').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        });
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                document.getElementById('docCount').textContent = `${data.vector_db.total_documents} Documents`;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+                document.getElementById('docCount').textContent = 'Stats unavailable';
+            }
+        }
+
+        function useExample(query) {
+            document.getElementById('userInput').value = query;
+            document.querySelector('.welcome-message').style.display = 'none';
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const query = input.value.trim();
+            
+            if (!query) return;
+
+            document.querySelector('.welcome-message').style.display = 'none';
+
+            addMessage(query, 'user');
+            input.value = '';
+
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('sendBtn').disabled = true;
+
+            try {
+                const response = await fetch('/api/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query, query_type: currentQueryType })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    addMessage(data.response, 'bot', data.code_output);
+                } else {
+                    addMessage('Sorry, I encountered an error: ' + data.error, 'bot');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage('Sorry, I could not process your request. Please check if the server is running.', 'bot');
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+                document.getElementById('sendBtn').disabled = false;
+            }
+        }
+
+        function addMessage(text, sender, codeOutput = null) {
+            const chatArea = document.getElementById('chatArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+
+            const avatar = document.createElement('div');
+            avatar.className = `avatar ${sender}`;
+            avatar.textContent = sender === 'bot' ? '🤖' : '👤';
+
+            const content = document.createElement('div');
+            content.className = 'message-content';
+            
+            let formattedText = text;
+            
+            const codeRegex = /```python\n([\s\S]*?)\n```/g;
+            formattedText = formattedText.replace(codeRegex, (match, code) => {
+                return `<div class="code-block">${escapeHtml(code)}</div>`;
+            });
+            
+            formattedText = formattedText.replace(/\\begin\{itemize\}/g, '');
+            formattedText = formattedText.replace(/\\end\{itemize\}/g, '');
+            formattedText = formattedText.replace(/\\begin\{enumerate\}/g, '');
+            formattedText = formattedText.replace(/\\end\{enumerate\}/g, '');
+            formattedText = formattedText.replace(/\\item\s+/g, '- ');
+            
+            const latexBlocks = [];
+            formattedText = formattedText.replace(/\$\$[\s\S]*?\$\$/g, (match) => {
+                const id = `__LATEX_${latexBlocks.length}__`;
+                latexBlocks.push(match);
+                return id;
+            });
+            
+            formattedText = formattedText.replace(/\n/g, '<br>');
+            
+            latexBlocks.forEach((block, idx) => {
+                formattedText = formattedText.replace(`__LATEX_${idx}__`, block);
+            });
+            
+            content.innerHTML = formattedText;
+
+            if (codeOutput) {
+                const outputDiv = document.createElement('div');
+                outputDiv.className = 'code-output';
+                outputDiv.innerHTML = '<strong>Output:</strong><br>' + escapeHtml(codeOutput).replace(/\n/g, '<br>');
+                content.appendChild(outputDiv);
+            }
+
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(content);
+            chatArea.appendChild(messageDiv);
+
+            chatArea.scrollTop = chatArea.scrollHeight;
+
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise([messageDiv]).catch(err => console.error(err));
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
